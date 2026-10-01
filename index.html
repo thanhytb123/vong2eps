@@ -221,7 +221,7 @@
             font-size: 20px; 
             font-weight: 700;
             padding: 0 25px;
-            will-change: transform;
+            will-change: transform; /* Bật tăng tốc GPU */
         }
 
         #scroll-content div {
@@ -458,6 +458,7 @@
             replayDelay: 3000
         };
 
+        // Cache dữ liệu tải về để không bị khựng (lag) khi chuyển đổi qua lại giữa các tab
         const dataCache = {}; 
 
         const fetchAndParseData = async (fileName) => {
@@ -534,6 +535,7 @@
             renderList(filterByCategory(firstCat));
         };
 
+        // Gắn Event Delegation cho sub-nav (tránh gắn sự kiện chồng chéo)
         document.getElementById('sub-nav').addEventListener('click', (e) => {
             const targetBtn = e.target.closest('.sub-tab-btn');
             if (targetBtn) {
@@ -565,6 +567,7 @@
             else document.getElementById('study-card').innerHTML = '<div class="empty-state">Không có câu hỏi.</div>';
         };
 
+        // Gắn Event Delegation cho list (Tối ưu RAM siêu tiết kiệm bộ nhớ)
         document.getElementById('list-container').addEventListener('click', (e) => {
             const item = e.target.closest('.list-item');
             if (item) {
@@ -578,22 +581,29 @@
             if(!item) return;
 
             document.querySelectorAll('.list-item').forEach(c => c.classList.remove('active'));
+            
+            // Tự cuộn NỘI BỘ trong khung danh sách, giữ màn hình chính/học cố định không bị nhảy
+            const container = document.getElementById('list-container');
             const targetItem = document.querySelector(`.list-item[data-index="${index}"]`);
-            if(targetItem) {
+            if(targetItem && container) {
                 targetItem.classList.add('active');
-                // Sửa lỗi: Chỉ cuộn riêng khung chứa danh sách câu hỏi (#list-container), không làm trôi/cuộn màn hình chính
-                const container = document.getElementById('list-container');
-                if (container) {
-                    const itemTop = targetItem.offsetTop;
-                    const itemBottom = itemTop + targetItem.offsetHeight;
-                    if (itemTop < container.scrollTop) {
-                        container.scrollTo({ top: itemTop, behavior: 'smooth' });
-                    } else if (itemBottom > container.scrollTop + container.clientHeight) {
-                        container.scrollTo({ top: itemBottom - container.clientHeight, behavior: 'smooth' });
-                    }
+                const containerRect = container.getBoundingClientRect();
+                const itemRect = targetItem.getBoundingClientRect();
+
+                if (itemRect.top < containerRect.top) {
+                    container.scrollTo({
+                        top: container.scrollTop + (itemRect.top - containerRect.top) - 8,
+                        behavior: 'smooth'
+                    });
+                } else if (itemRect.bottom > containerRect.bottom) {
+                    container.scrollTo({
+                        top: container.scrollTop + (itemRect.bottom - containerRect.bottom) + 8,
+                        behavior: 'smooth'
+                    });
                 }
             }
 
+            // Tối ưu thuật toán tự fallback đuôi ảnh an toàn không bị infinite loop
             document.getElementById('study-card').innerHTML = `
                 <img src="${item.imageSrc}" class="sc-img" onerror="
                     const exts = ['.png', '.JPG', '.PNG'];
@@ -727,6 +737,7 @@
                 } else {
                     document.getElementById('data-view-container').classList.add('active');
                     
+                    // Cơ chế Cache giúp load cực nhanh không bị trễ API
                     if (!dataCache[targetId]) {
                         document.getElementById('study-card').innerHTML = '<div class="empty-state"><i class="fas fa-spinner fa-spin"></i> Đang tải dữ liệu...</div>';
                         const data = await fetchAndParseData(appState.filesMap[targetId]);
@@ -757,7 +768,7 @@
         let animationFrameId = null;
         let pausedTimeAccumulated = 0;
         let pauseStartTimestamp = null;
-        let lastActiveIndex = -1;
+        let lastActiveIndex = -1; // Biến cờ cho RequestAnimationFrame
 
         textArea.addEventListener('input', () => {
             charCountDisplay.textContent = `${textArea.value.length} ký tự`;
@@ -782,6 +793,7 @@
             const rawLines = rawText.split('\n').filter(l => l.trim() !== '');
             let processedLines = [];
             rawLines.forEach(line => {
+                // Tối ưu hoá phân tách câu lỗi thiếu dấu cách người dùng hay gặp
                 const subSentences = line.replace(/([.?!])([^\s.?!])/g, '$1 $2').split(/(?<=[.?!])\s+/);
                 subSentences.forEach(sub => {
                     if(sub.trim()) processedLines.push(sub.trim());
@@ -827,6 +839,7 @@
             }, 1000);
         });
 
+        // Đã tối ưu vòng lặp RAF: Chỉ tác động lên DOM khi thực sự đổi câu (tiết kiệm GPU cực khủng)
         function runStep(timestamp) {
             if (isPaused) return;
 
