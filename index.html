@@ -463,6 +463,24 @@
         // Cache dữ liệu tải về để không bị khựng (lag) khi chuyển đổi qua lại giữa các tab
         const dataCache = {}; 
 
+        // Hàm Tải trước (Preload) hình ảnh vào RAM ngầm để khi bấm là hiện ngay lập tức 0ms
+        const preloadImages = (dataList) => {
+            if (!dataList || !Array.isArray(dataList)) return;
+            dataList.forEach(item => {
+                if (item.imageSrc) {
+                    const img = new Image();
+                    img.src = item.imageSrc;
+                    
+                    // Thử preload trước các định dạng phổ biến để cache sẵn
+                    const exts = ['.png', '.JPG', '.PNG'];
+                    exts.forEach(ext => {
+                        const altImg = new Image();
+                        altImg.src = item.imageSrc.replace(/\.[a-zA-Z]+$/, ext);
+                    });
+                }
+            });
+        };
+
         const fetchAndParseData = async (fileName) => {
             try {
                 const res = await fetch(`${fileName}?v=${Date.now()}`, { cache: 'no-store' });
@@ -497,6 +515,10 @@
                         imageSrc: `image/${slug}_${categoryCounts[slug]}.jpg`
                     });
                 });
+
+                // Tự động preload ngầm ngay khi parse xong file HTML
+                preloadImages(parsedData);
+
                 return parsedData;
             } catch (error) {
                 console.error(error);
